@@ -8,10 +8,10 @@
 goscan/
 ├── 📂 Source Code (Go)
 │   ├── cmd/goscan/        - Main application
-│   ├── pkg/scanner/       - TCP/UDP scanning
-│   ├── pkg/detector/      - Service detection
-│   ├── pkg/output/        - JSON/CSV/TXT export
-│   └── pkg/utils/         - Utilities
+│   ├── scanner/       - TCP/UDP scanning
+│   ├── detector/      - Service detection
+│   ├── output/        - JSON/CSV/TXT export
+│   └── utils/         - Utilities
 │
 ├── 📚 Documentation
 │   ├── README.md          - Full documentation
@@ -116,27 +116,6 @@ Scan Statistics:
 - Interface pattern for extensibility
 - Factory pattern for clean initialization
 - Channel-based communication (Go idiomatic)
-
-## 🛠️ Building & Development
-
-### Quick Build
-```bash
-make build          # Build binary
-make run            # Build and run
-make test           # Run tests
-```
-
-### Multi-Platform Build
-```bash
-make build-all      # Linux, macOS, Windows
-```
-
-### Development
-```bash
-make fmt            # Format code
-make lint           # Run linter
-make clean          # Clean artifacts
-```
 
 ## 📋 Requirements
 
