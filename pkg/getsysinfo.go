@@ -8,13 +8,13 @@ import (
 )
 
 type SysInfo struct {
-	OS          string
-	ARCH        string
-	Host        string
-	Groupid     string
-	Userid      string
-	Username    string
-	UserHomeDir string
+	OS          string `json:"os"`
+	ARCH        string `json:"arch"`
+	Host        string `json:"hostname"`
+	Username    string `json:"username"`
+	UserHomeDir string `json:"home_dir"`
+	Groupid     string `json:"gid"`
+	Userid      string `json:"uid"`
 }
 
 func GetSysInfo() SysInfo {
@@ -30,8 +30,10 @@ func GetSysInfo() SysInfo {
 
 	u, err := user.Current()
 	if err != nil {
-		log.Fatalf("user.Current() failed: %v", err)
+		log.Printf("Warning: could not get user info: %v", err)
+		return sysInfo
 	}
+
 	sysInfo.Username = u.Username
 	sysInfo.UserHomeDir = u.HomeDir
 	sysInfo.Groupid = u.Gid
