@@ -4,7 +4,9 @@ import (
 	"flag"
 	"fmt"
 	"goscan/output"
+	"goscan/pkg/logger"
 	"goscan/scanner"
+	"goscan/tui"
 	"goscan/utils"
 	"os"
 	"sync"
@@ -15,8 +17,24 @@ import (
 )
 
 func main() {
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Error("Panic recovered: %v", r)
+			os.Exit(1)
+		}
+	}()
+
 	var flags utils.Flags
 	flags.InitializeFlags()
+
+	logger.Init(flags.Verbose)
+	logger.Info("Starting goscan v1.0.0")
+	logger.Debug("Verbose mode enabled")
+
+	if flags.TUI {
+		launchTUI()
+		return
+	}
 
 	if flags.Host == "" {
 		fmt.Println("Error: host is required")
@@ -151,4 +169,8 @@ func saveResults(results []scanner.Result, format, filename string) string {
 	}
 
 	return fullPath
+}
+
+func launchTUI() {
+	tui.Run()
 }

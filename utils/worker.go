@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"goscan/detector"
+	"goscan/pkg/logger"
 	"goscan/scanner"
 	"sync"
 	"sync/atomic"
@@ -33,7 +34,7 @@ func Worker(id int, host string, sc scanner.Scanner, limiter *rate.Limiter, port
 				Status:  "open",
 			}
 		} else if verbose {
-			fmt.Printf("[-] Port %5d closed\n", port)
+			logger.Debug("Port %5d closed", port)
 		}
 	}
 }

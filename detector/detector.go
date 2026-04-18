@@ -5,8 +5,8 @@ import "strings"
 var serviceSignatures = map[string]string{
 	"SSH":        "SSH-",
 	"HTTP":       "HTTP/",
-	"FTP":        "220",
-	"SMTP":       "220",
+	"SMTP":       "ESMTP",
+	"FTP":        "220-",
 	"MySQL":      "mysql",
 	"PostgreSQL": "PostgreSQL",
 	"Redis":      "REDIS",

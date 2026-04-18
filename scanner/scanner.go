@@ -3,10 +3,11 @@ package scanner
 import (
 	"bufio"
 	"fmt"
-	"log"
 	"net"
 	"strings"
 	"time"
+
+	"goscan/pkg/logger"
 )
 
 type Scanner interface {
@@ -43,7 +44,7 @@ func (t *TCPScanner) ScanPort(addr string) (string, error) {
 	}
 	defer func() {
 		if err := conn.Close(); err != nil {
-			log.Printf("Failed to close connection to %s: %v", addr, err)
+			logger.Debug("Failed to close connection to %s: %v", addr, err)
 		}
 	}()
 

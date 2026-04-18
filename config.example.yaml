@@ -1,0 +1,10 @@
+host: 127.0.0.1
+protocol: tcp
+port_range: 1-1024
+workers: 25
+timeout: 5s
+output_format: json
+output_file: scan_results
+show_progress: true
+verbose: false
+tui: false
