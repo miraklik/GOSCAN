@@ -1,10 +1,8 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
-	"goscan/detector"
 	"goscan/output"
 	"goscan/scanner"
 	"goscan/utils"
@@ -17,45 +15,37 @@ import (
 )
 
 func main() {
-	host := flag.String("host", "127.0.0.1", "Target host to scan")
-	numWorkers := flag.Int("w", 25, "Number of concurrent workers")
-	portRange := flag.String("p", "1-1024", "Port range (e.g., 80,443 or 1-1024 or 1-65535)")
-	protocol := flag.String("proto", "tcp", "Protocol: tcp or udp")
-	timeout := flag.Duration("t", 5*time.Second, "Connection timeout")
-	outputFormat := flag.String("o", "json", "Output format: json, csv, txt")
-	outputFile := flag.String("output", "scan_results", "Output file name (without extension)")
-	showProgress := flag.Bool("progress", true, "Show progress indicator")
-	verbose := flag.Bool("v", false, "Verbose mode (show closed ports)")
-	flag.Parse()
+	var flags utils.Flags
+	flags.InitializeFlags()
 
-	if *host == "" {
+	if flags.Host == "" {
 		fmt.Println("Error: host is required")
 		flag.Usage()
 		os.Exit(1)
 	}
 
 	var sc scanner.Scanner
-	switch *protocol {
+	switch flags.Protocol {
 	case "tcp":
-		sc = scanner.NewTCPScanner(*timeout)
+		sc = scanner.NewTCPScanner(flags.Timeout)
 	case "udp":
-		sc = scanner.NewUDPScanner(*timeout)
+		sc = scanner.NewUDPScanner(flags.Timeout)
 	default:
-		fmt.Printf("Error: unsupported protocol '%s'\n", *protocol)
+		fmt.Printf("Error: unsupported protocol '%s'\n", flags.Protocol)
 		os.Exit(1)
 	}
 
-	ports := utils.ParsePorts(*portRange)
+	ports := utils.ParsePorts(flags.PortRange)
 	if len(ports) == 0 {
 		fmt.Println("Error: invalid port range")
 		os.Exit(1)
 	}
 
-	rateLimiter := rate.NewLimiter(rate.Limit(*numWorkers), *numWorkers)
+	rateLimiter := rate.NewLimiter(rate.Limit(flags.NumWorkers), flags.NumWorkers)
 
-	fmt.Printf("[*] Starting %s scan on %s\n", *protocol, *host)
-	fmt.Printf("[*] Port range: %s (%d ports)\n", *portRange, len(ports))
-	fmt.Printf("[*] Workers: %d | Timeout: %s\n", *numWorkers, *timeout)
+	fmt.Printf("[*] Starting %s scan on %s\n", flags.Protocol, flags.Host)
+	fmt.Printf("[*] Port range: %s (%d ports)\n", flags.PortRange, len(ports))
+	fmt.Printf("[*] Workers: %d | Timeout: %s\n", flags.NumWorkers, flags.Timeout)
 	fmt.Println(utils.Separator())
 
 	start := time.Now()
@@ -67,13 +57,13 @@ func main() {
 	var scannedPorts int32
 	var openPorts int32
 
-	if *showProgress {
-		go progressMonitor(&scannedPorts, &openPorts, len(ports))
+	if flags.ShowProgress {
+		go utils.ProgressMonitor(&scannedPorts, &openPorts, len(ports))
 	}
 
-	for i := 0; i < *numWorkers; i++ {
+	for i := 0; i < flags.NumWorkers; i++ {
 		wg.Add(1)
-		go worker(i+1, *host, sc, rateLimiter, portsChan, resultsChan, &wg, &scannedPorts, *verbose)
+		go utils.Worker(i+1, flags.Host, sc, rateLimiter, portsChan, resultsChan, &wg, &scannedPorts, flags.Verbose)
 	}
 
 	var allResults []scanner.Result
@@ -86,8 +76,8 @@ func main() {
 			mu.Lock()
 			allResults = append(allResults, res)
 			mu.Unlock()
-			if !*showProgress {
-				printResult(res)
+			if !flags.ShowProgress {
+				utils.PrintResult(res)
 			}
 		}
 		close(done)
@@ -106,7 +96,7 @@ func main() {
 
 	duration := time.Since(start)
 
-	if *showProgress {
+	if flags.ShowProgress {
 		fmt.Print("\r" + utils.Separator() + "\n")
 	}
 
@@ -115,94 +105,25 @@ func main() {
 	} else {
 		fmt.Printf("[+] Found %d open port(s)\n", len(allResults))
 
-		if *showProgress {
+		if flags.ShowProgress {
 			fmt.Println()
 			for _, res := range allResults {
-				printResult(res)
+				utils.PrintResult(res)
 			}
 		}
 
-		filename := saveResults(allResults, *outputFormat, *outputFile)
+		filename := saveResults(allResults, flags.OutputFormat, flags.OutputFile)
 		if filename != "" {
 			fmt.Printf("[+] Results saved to: %s\n", filename)
 		}
 	}
 
-	printStats(utils.Stats{
+	utils.PrintStats(utils.Stats{
 		TotalPorts:  len(ports),
 		OpenPorts:   len(allResults),
 		ClosedPorts: len(ports) - len(allResults),
 		Duration:    duration,
 	})
-}
-
-func worker(id int, host string, sc scanner.Scanner, limiter *rate.Limiter, ports <-chan int, results chan<- scanner.Result, wg *sync.WaitGroup, scanned *int32, verbose bool) {
-	defer wg.Done()
-
-	for port := range ports {
-		if limiter != nil {
-			limiter.Wait(context.Background())
-		}
-
-		addr := fmt.Sprintf("%s:%d", host, port)
-		banner, err := sc.ScanPort(addr)
-
-		atomic.AddInt32(scanned, 1)
-
-		if err == nil {
-			service := detector.DetectService(banner, port)
-			results <- scanner.Result{
-				Port:    port,
-				Service: service,
-				Banner:  banner,
-				Status:  "open",
-			}
-		} else if verbose {
-			fmt.Printf("[-] Port %5d closed\n", port)
-		}
-	}
-}
-
-func progressMonitor(scanned, open *int32, total int) {
-	ticker := time.NewTicker(500 * time.Millisecond)
-	defer ticker.Stop()
-
-	for range ticker.C {
-		current := atomic.LoadInt32(scanned)
-		openCount := atomic.LoadInt32(open)
-
-		if current >= int32(total) {
-			break
-		}
-
-		percentage := float64(current) / float64(total) * 100
-		bar := progressBar(int(percentage))
-
-		fmt.Printf("\r[%s] %d/%d ports (%.1f%%) | %d open   ",
-			bar, current, total, percentage, openCount)
-	}
-}
-
-func progressBar(percentage int) string {
-	width := 30
-	filled := percentage * width / 100
-
-	bar := ""
-	for i := 0; i < width; i++ {
-		if i < filled {
-			bar += "█"
-		} else {
-			bar += "░"
-		}
-	}
-	return bar
-}
-
-func printResult(r scanner.Result) {
-	fmt.Printf("%s[+]%s Port %s%5d%s | %-12s | %s\n",
-		utils.ColorGreen, utils.ColorReset,
-		utils.ColorYellow, r.Port, utils.ColorReset,
-		r.Service, r.Banner)
 }
 
 func saveResults(results []scanner.Result, format, filename string) string {
@@ -230,22 +151,4 @@ func saveResults(results []scanner.Result, format, filename string) string {
 	}
 
 	return fullPath
-}
-
-func printStats(stats utils.Stats) {
-	fmt.Println(utils.Separator())
-	fmt.Println("Scan Statistics:")
-	fmt.Printf("  Total Ports:    %d\n", stats.TotalPorts)
-	if stats.TotalPorts > 0 {
-		percentage := float64(stats.OpenPorts) / float64(stats.TotalPorts) * 100
-		fmt.Printf("  Open Ports:     %d (%.2f%%)\n", stats.OpenPorts, percentage)
-	} else {
-		fmt.Printf("  Open Ports:     %d\n", stats.OpenPorts)
-	}
-	fmt.Printf("  Closed Ports:   %d\n", stats.ClosedPorts)
-	fmt.Printf("  Duration:       %s\n", stats.Duration)
-	if stats.Duration.Seconds() > 0 {
-		fmt.Printf("  Ports/second:   %.2f\n", float64(stats.TotalPorts)/stats.Duration.Seconds())
-	}
-	fmt.Println(utils.Separator())
 }

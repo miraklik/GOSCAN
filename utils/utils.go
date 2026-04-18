@@ -1,8 +1,11 @@
 package utils
 
 import (
+	"fmt"
+	"goscan/scanner"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -83,4 +86,64 @@ func FormatDuration(d time.Duration) string {
 	minutes := int(d.Minutes())
 	seconds := int(d.Seconds()) % 60
 	return strconv.Itoa(minutes) + "m " + strconv.Itoa(seconds) + "s"
+}
+
+func ProgressMonitor(scanned, open *int32, total int) {
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		current := atomic.LoadInt32(scanned)
+		openCount := atomic.LoadInt32(open)
+
+		if current >= int32(total) {
+			break
+		}
+
+		percentage := float64(current) / float64(total) * 100
+		bar := progressBar(int(percentage))
+
+		fmt.Printf("\r[%s] %d/%d ports (%.1f%%) | %d open   ",
+			bar, current, total, percentage, openCount)
+	}
+}
+
+func progressBar(percentage int) string {
+	width := 30
+	filled := percentage * width / 100
+
+	bar := ""
+	for i := 0; i < width; i++ {
+		if i < filled {
+			bar += "█"
+		} else {
+			bar += "░"
+		}
+	}
+	return bar
+}
+
+func PrintResult(r scanner.Result) {
+	fmt.Printf("%s[+]%s Port %s%5d%s | %-12s | %s\n",
+		ColorGreen, ColorReset,
+		ColorYellow, r.Port, ColorReset,
+		r.Service, r.Banner)
+}
+
+func PrintStats(stats Stats) {
+	fmt.Println(Separator())
+	fmt.Println("Scan Statistics:")
+	fmt.Printf("  Total Ports:    %d\n", stats.TotalPorts)
+	if stats.TotalPorts > 0 {
+		percentage := float64(stats.OpenPorts) / float64(stats.TotalPorts) * 100
+		fmt.Printf("  Open Ports:     %d (%.2f%%)\n", stats.OpenPorts, percentage)
+	} else {
+		fmt.Printf("  Open Ports:     %d\n", stats.OpenPorts)
+	}
+	fmt.Printf("  Closed Ports:   %d\n", stats.ClosedPorts)
+	fmt.Printf("  Duration:       %s\n", stats.Duration)
+	if stats.Duration.Seconds() > 0 {
+		fmt.Printf("  Ports/second:   %.2f\n", float64(stats.TotalPorts)/stats.Duration.Seconds())
+	}
+	fmt.Println(Separator())
 }
