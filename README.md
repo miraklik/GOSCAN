@@ -1,4 +1,9 @@
-# GoScan - Professional Port Scanner
+<h1 align="center">
+  <br>
+  <a href="https://github.com/miraklik/GOSCAN"><img src="/static/goscan-logo.png" alt="Goscan logo"></a>
+</h1>
+
+# Goscan - Professional Port Scanner
 
 A production-ready TCP/UDP port scanner written in Go with service detection.
 
