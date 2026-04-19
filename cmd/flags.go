@@ -52,7 +52,7 @@ func init() {
 	commandCMD.Flags().StringVarP(&PortRange, "ports", "p", "1-65535", "Port range to scan (e.g., 1-1000)")
 	commandCMD.Flags().StringVarP(&Protocol, "protocol", "", "tcp", "Protocol to scan (tcp or udp)")
 	commandCMD.Flags().DurationVarP(&Timeout, "timeout", "", 5*time.Second, "Timeout for each scan attempt")
-	commandCMD.Flags().StringVarP(&OutputFormat, "output-format", "", "text", "Output format (text, json, xml)")
+	commandCMD.Flags().StringVarP(&OutputFormat, "output-format", "", "json", "Output format (txt, json, xml)")
 	commandCMD.Flags().StringVarP(&OutputFile, "output-file", "", "", "File to save the scan results")
 	commandCMD.Flags().BoolVarP(&ShowProgress, "progress", "", false, "Show progress during scanning")
 	commandCMD.Flags().BoolVarP(&Verbose, "verbose", "v", false, "Enable verbose output")
