@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"goscan/cmd"
 	"goscan/output"
 	"goscan/pkg/logger"
 	"goscan/scanner"
@@ -24,46 +25,45 @@ func main() {
 		}
 	}()
 
-	var flags utils.Flags
-	flags.InitializeFlags()
+	cmd.Execute()
 
-	logger.Init(flags.Verbose)
+	logger.Init(cmd.Verbose)
 	logger.Info("Starting goscan v1.0.0")
 	logger.Debug("Verbose mode enabled")
 
-	if flags.TUI {
+	if cmd.TUI {
 		launchTUI()
 		return
 	}
 
-	if flags.Host == "" {
+	if cmd.Host == "" {
 		fmt.Println("Error: host is required")
 		flag.Usage()
 		os.Exit(1)
 	}
 
 	var sc scanner.Scanner
-	switch flags.Protocol {
+	switch cmd.Protocol {
 	case "tcp":
-		sc = scanner.NewTCPScanner(flags.Timeout)
+		sc = scanner.NewTCPScanner(cmd.Timeout)
 	case "udp":
-		sc = scanner.NewUDPScanner(flags.Timeout)
+		sc = scanner.NewUDPScanner(cmd.Timeout)
 	default:
-		fmt.Printf("Error: unsupported protocol '%s'\n", flags.Protocol)
+		fmt.Printf("Error: unsupported protocol '%s'\n", cmd.Protocol)
 		os.Exit(1)
 	}
 
-	ports := utils.ParsePorts(flags.PortRange)
+	ports := utils.ParsePorts(cmd.PortRange)
 	if len(ports) == 0 {
 		fmt.Println("Error: invalid port range")
 		os.Exit(1)
 	}
 
-	rateLimiter := rate.NewLimiter(rate.Limit(flags.NumWorkers), flags.NumWorkers)
+	rateLimiter := rate.NewLimiter(rate.Limit(cmd.NumWorkers), cmd.NumWorkers)
 
-	fmt.Printf("[*] Starting %s scan on %s\n", flags.Protocol, flags.Host)
-	fmt.Printf("[*] Port range: %s (%d ports)\n", flags.PortRange, len(ports))
-	fmt.Printf("[*] Workers: %d | Timeout: %s\n", flags.NumWorkers, flags.Timeout)
+	fmt.Printf("[*] Starting %s scan on %s\n", cmd.Protocol, cmd.Host)
+	fmt.Printf("[*] Port range: %s (%d ports)\n", cmd.PortRange, len(ports))
+	fmt.Printf("[*] Workers: %d | Timeout: %s\n", cmd.NumWorkers, cmd.Timeout)
 	fmt.Println(utils.Separator())
 
 	start := time.Now()
@@ -75,13 +75,13 @@ func main() {
 	var scannedPorts int32
 	var openPorts int32
 
-	if flags.ShowProgress {
+	if cmd.ShowProgress {
 		go utils.ProgressMonitor(&scannedPorts, &openPorts, len(ports))
 	}
 
-	for i := 0; i < flags.NumWorkers; i++ {
+	for i := 0; i < cmd.NumWorkers; i++ {
 		wg.Add(1)
-		go utils.Worker(i+1, flags.Host, sc, rateLimiter, portsChan, resultsChan, &wg, &scannedPorts, flags.Verbose)
+		go utils.Worker(i+1, cmd.Host, sc, rateLimiter, portsChan, resultsChan, &wg, &scannedPorts, cmd.Verbose)
 	}
 
 	var allResults []scanner.Result
@@ -94,7 +94,7 @@ func main() {
 			mu.Lock()
 			allResults = append(allResults, res)
 			mu.Unlock()
-			if !flags.ShowProgress {
+			if !cmd.ShowProgress {
 				utils.PrintResult(res)
 			}
 		}
@@ -114,7 +114,7 @@ func main() {
 
 	duration := time.Since(start)
 
-	if flags.ShowProgress {
+	if cmd.ShowProgress {
 		fmt.Print("\r" + utils.Separator() + "\n")
 	}
 
@@ -123,14 +123,14 @@ func main() {
 	} else {
 		fmt.Printf("[+] Found %d open port(s)\n", len(allResults))
 
-		if flags.ShowProgress {
+		if cmd.ShowProgress {
 			fmt.Println()
 			for _, res := range allResults {
 				utils.PrintResult(res)
 			}
 		}
 
-		filename := saveResults(allResults, flags.OutputFormat, flags.OutputFile)
+		filename := saveResults(allResults, cmd.OutputFormat, cmd.OutputFile)
 		if filename != "" {
 			fmt.Printf("[+] Results saved to: %s\n", filename)
 		}
